@@ -1,0 +1,1698 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CRUML - UML to Java Generator</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Added highlight.js for syntax highlighting -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/atom-one-dark.min.css">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
+    <style>
+        /* General Body and Layout Styles */
+        body {
+            font-family: 'Noto Sans', sans-serif;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            margin: 0;
+            padding: 1rem;
+            background-color: #f0f4f8;
+            color: #333;
+            min-height: 100vh;
+        }
+
+        #main-content {
+            width: 100%;
+            max-width: 1600px; /* Max width for large screens */
+        }
+
+        /* Toolbars */
+        #toolbar, #file-toolbar {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+            padding: 12px;
+            background-color: white;
+            border-radius: 12px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+            margin-bottom: 1rem;
+        }
+
+        /* Buttons */
+        .btn {
+            padding: 8px 16px; border: 1px solid transparent; border-radius: 8px;
+            cursor: pointer; font-weight: 500; transition: all 0.2s ease;
+            font-size: 0.875rem;
+        }
+        .btn:disabled { background-color: #d1d5db; cursor: not-allowed; opacity: 0.7; }
+        .btn-primary { background-color: #3b82f6; color: white; }
+        .btn-primary:not(:disabled):hover { background-color: #2563eb; }
+        .btn-secondary { background-color: #6b7280; color: white; }
+        .btn-secondary:not(:disabled):hover { background-color: #4b5563; }
+        .btn-success { background-color: #22c55e; color: white; }
+        .btn-success:not(:disabled):hover { background-color: #16a34a; }
+        .btn-danger { background-color: #ef4444; color: white; }
+        .btn-danger:not(:disabled):hover { background-color: #dc2626; }
+        .btn.active {
+            background-color: #10b981; color: white;
+            box-shadow: inset 0 2px 4px rgba(0,0,0,0.2);
+        }
+        .btn:active:not(:disabled) { transform: translateY(1px); }
+
+        /* Canvas and Code View */
+        #editorCanvas {
+            border: 1px solid #cbd5e1; background-color: #ffffff;
+            border-radius: 12px; box-shadow: 0 4px 12px rgba(0,0,0,0.05);
+            cursor: default;
+            flex-shrink: 0; /* Prevent canvas from shrinking */
+            user-select: none; /* Prevent text selection on canvas only */
+        }
+
+        /* Styles for the code view container */
+        #code-view-container {
+             height: 768px; /* Match canvas height */
+             background-color: #282c34; /* atom-one-dark background */
+             border-radius: 12px;
+             display: flex;
+             flex-direction: column;
+             overflow: hidden;
+             border: 1px solid #4b5563;
+        }
+        
+        #code-view-header {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            padding: 0.5rem;
+            background-color: #374151;
+            position: relative;
+        }
+
+        #code-view-header h3 {
+             color: #d1d5db;
+        }
+
+        #copyCodeBtn {
+            position: absolute;
+            right: 1rem;
+            top: 50%;
+            transform: translateY(-50%);
+            padding: 4px 8px;
+            font-size: 0.75rem;
+        }
+
+        #code-view-container pre {
+            margin: 0;
+            flex-grow: 1;
+            overflow: auto;
+        }
+        
+        #code-view-container code.hljs {
+            padding: 1rem;
+            white-space: pre-wrap;
+            word-break: break-all;
+        }
+
+        /* Status Bar */
+        #statusBar {
+            margin-top: 1rem; padding: 8px 12px; background-color: #e2e8f0;
+            color: #4a5568; border-radius: 8px; font-size: 0.8rem;
+            min-height: 18px; text-align: center; width: 100%; max-width: 1600px;
+        }
+        #appTitle {
+            font-size: 1.5rem; font-weight: 600; color: #1f2937;
+            margin-bottom: 0.75rem;
+        }
+
+        /* Modal Styles */
+        .modal-overlay {
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            background-color: rgba(0,0,0,0.5); display: flex;
+            justify-content: center; align-items: center; z-index: 1000;
+        }
+        .modal-content {
+            background-color: white; padding: 20px; border-radius: 10px;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.3); text-align: left;
+            width: 90%; max-height: 90vh; overflow-y: auto;
+        }
+        .modal-content.create-class-editor { max-width: 550px; }
+        .modal-content.member-editor { max-width: 600px; }
+        .modal-content.multiplicity-editor, .modal-content.abstract-confirm-editor { max-width: 450px; }
+        .modal-content.note-editor { max-width: 400px; }
+
+
+        .modal-content h3 {
+            font-size: 1.3rem; font-weight: 600; margin-bottom: 15px;
+            color: #333; text-align: center;
+        }
+        .modal-content p { margin-bottom: 20px; font-size: 1.3rem; color: #333; text-align: center; }
+        .modal-buttons { margin-top: 20px; display: flex; justify-content: flex-end; gap: 10px; }
+
+        .member-editor-section { border: 1px solid #ddd; border-radius: 8px; padding: 15px; margin-bottom: 20px; }
+        .member-editor-section h4 { font-size: 1.3rem; font-weight:500; margin-bottom:10px; color: #555; }
+        .form-group { margin-bottom: 12px; }
+        .form-group.checkbox-group { display: flex; align-items: center; gap: 8px; }
+        .form-group.checkbox-group input[type="checkbox"] { width: auto; }
+        .form-group.checkbox-group label { margin-bottom: 0; }
+        label { display: block; margin-bottom: 4px; font-weight: 500; font-size: 0.875rem; }
+        input[type="text"], select, textarea {
+            width: 100%; padding: 8px 10px; border: 1px solid #ccc;
+            border-radius: 6px; font-size: 1.1rem; box-sizing: border-box;
+            font-family: 'Noto Sans', sans-serif;
+        }
+        textarea { min-height: 60px; resize: vertical; }
+        .current-members-list {
+            margin-top: 10px; padding: 10px; border: 1px solid #e0e0e0;
+            border-radius: 6px; min-height: 40px; max-height: 120px;
+            overflow-y: auto; background-color: #f9f9f9; font-size: 1.1rem;
+        }
+        .current-members-list div {
+            padding: 4px 0; border-bottom: 1px dashed #eee;
+            display: flex; justify-content: space-between; align-items: center;
+        }
+        .current-members-list div:last-child { border-bottom: none; }
+        .delete-member-btn {
+            background: none; border: none; color: #ef4444; cursor: pointer;
+            font-size: 1.1rem; padding: 2px 5px;
+        }
+        .delete-member-btn:hover { color: #dc2626; font-weight: bold; }
+        #modalMessage, #createClassModalMessage {
+            padding: 8px; margin-bottom: 10px; border-radius: 6px;
+            font-size: 1.1rem; text-align: center; display: none;
+        }
+        #modalMessage.success, #createClassModalMessage.success { background-color: #d1fae5; color: #065f46; border: 1px solid #6ee7b7;}
+        #modalMessage.error, #createClassModalMessage.error { background-color: #fee2e2; color: #991b1b; border: 1px solid #fca5a5;}
+    </style>
+</head>
+<body class="bg-gray-100">
+    <h1 id="appTitle">CRUML - UML to Java Generator</h1>
+    <div id="file-toolbar">
+        <button id="saveBtn" class="btn btn-primary">Save Diagram</button>
+        <label for="loadInput" class="btn btn-primary">Load Diagram</label>
+        <input type="file" id="loadInput" accept=".json" style="display: none;">
+        <button id="exportPngBtn" class="btn btn-success">Export as PNG</button>
+        <button id="undoBtn" class="btn btn-secondary" disabled>Undo</button>
+        <button id="redoBtn" class="btn btn-secondary" disabled>Redo</button>
+    </div>
+    <div id="toolbar">
+        <button id="selectModeBtn" class="btn btn-primary">Select</button>
+        <button id="addNodeBtn" class="btn btn-primary">Add Classifier</button>
+        <button id="addNoteBtn" class="btn btn-primary" style="background-color: #f59e0b;">Add Note</button>
+        <button id="addNoteLinkBtn" class="btn btn-secondary">Link Note</button>
+        <button id="addAssociationBtn" class="btn btn-secondary">Association</button>
+        <button id="addDependencyBtn" class="btn btn-secondary">Dependency</button>
+        <button id="addGeneralizationBtn" class="btn btn-secondary">Generalization</button>
+        <button id="addRealizationBtn" class="btn btn-secondary">Realization</button>
+        <button id="addAggregationBtn" class="btn btn-secondary">Aggregation</button>
+        <button id="addCompositionBtn" class="btn btn-secondary">Composition</button>
+        <button id="deleteSelectedBtn" class="btn btn-danger">Delete Selected</button>
+        <button id="clearCanvasBtn" class="btn btn-danger">Clear All</button>
+    </div>
+
+    <!-- Modals (Confirmation, Editors) -->
+    <div id="customConfirmModal" class="modal-overlay" style="display: none;">
+        <div class="modal-content"> <p id="customConfirmMessage">Are you sure?</p>
+            <div class="modal-buttons"> <button id="customConfirmYes" class="btn btn-danger">Yes</button> <button id="customConfirmNo" class="btn btn-secondary">No</button> </div>
+        </div>
+    </div>
+    <div id="abstractConfirmModal" class="modal-overlay" style="display: none;">
+        <div class="modal-content abstract-confirm-editor">
+            <h3>Abstract Parent</h3>
+            <p id="abstractConfirmMessage">The parent class is abstract. Should this new class also be abstract?</p>
+            <div class="modal-buttons">
+                 <button id="abstractConfirmNo" class="btn btn-secondary">No (Concrete)</button>
+                 <button id="abstractConfirmYes" class="btn btn-primary">Yes (Abstract)</button>
+            </div>
+        </div>
+    </div>
+    <div id="noteEditorModal" class="modal-overlay" style="display: none;">
+        <div class="modal-content note-editor">
+            <h3>Edit Note</h3>
+            <div class="form-group">
+                <label for="noteTextInput">Note Text:</label>
+                <textarea id="noteTextInput"></textarea>
+            </div>
+            <div class="modal-buttons">
+                <button id="cancelNoteBtn" class="btn btn-secondary">Cancel</button>
+                <button id="saveNoteBtn" class="btn btn-primary">Save Note</button>
+            </div>
+        </div>
+    </div>
+    <div id="createClassModal" class="modal-overlay" style="display: none;">
+        <div class="modal-content create-class-editor">
+            <h3>Create New Classifier</h3>
+            <div id="createClassModalMessage"></div>
+             <div class="form-group checkbox-group">
+                <label for="newIsInterfaceCheckbox">Is Interface?</label>
+                <input type="checkbox" id="newIsInterfaceCheckbox">
+            </div>
+            <div class="form-group">
+                <label for="newClassNameInput" id="newClassifierNameLabel">Class Name:</label>
+                <input type="text" id="newClassNameInput" placeholder="Enter name">
+            </div>
+            <div class="form-group">
+                <label for="newClassParentSelect" id="newClassifierParentLabel">Parent Class (for Generalization):</label>
+                <select id="newClassParentSelect">
+                    <option value="">None</option>
+                </select>
+            </div>
+             <div class="form-group checkbox-group" id="newClassAbstractGroup">
+                <input type="checkbox" id="newClassIsAbstract">
+                <label for="newClassIsAbstract">Abstract Class</label>
+            </div>
+            <div class="form-group">
+                <label for="newClassAttributesText">Initial Attributes (one per line: +/-/#/~ name : type {static}):</label>
+                <textarea id="newClassAttributesText" placeholder="+ id : int&#10;- name : String&#10;+ MAX_USERS : int {static}"></textarea>
+            </div>
+            <div class="form-group">
+                <label for="newClassMethodsText">Initial Methods (one per line: +/-/#/~ name(params) : returnType {static} {abstract}):</label>
+                <textarea id="newClassMethodsText" placeholder="+ getName() : String&#10;+ run() : void {abstract}"></textarea>
+            </div>
+            <div class="modal-buttons">
+                <button id="cancelCreateClassBtn" class="btn btn-secondary">Cancel</button>
+                <button id="confirmCreateClassBtn" class="btn btn-primary">Create</button>
+            </div>
+        </div>
+    </div>
+    <div id="classMemberEditorModal" class="modal-overlay" style="display: none;">
+        <div class="modal-content member-editor">
+            <h3 id="classMemberEditorTitle">Edit Members for ClassName</h3>
+            <div id="modalMessage"></div>
+            <div class="member-editor-section">
+                <h4>Attributes</h4>
+                <div class="form-group"> <label for="attrVisibility">Visibility:</label> <select id="attrVisibility"> <option value="public" selected>Public (+)</option> <option value="private">Private (-)</option> <option value="protected">Protected (#)</option> <option value="package">Package/Default (~)</option> </select> </div>
+                <div class="form-group"> <label for="attrName">Attribute Name:</label> <input type="text" id="attrName" placeholder="e.g., userName"> </div>
+                <div class="form-group"> <label for="attrType">Attribute Type:</label> <select id="attrType"> <option value="String">String</option> <option value="int">int</option> <option value="boolean">boolean</option> <option value="double">double</option> <option value="float">float</option> <option value="char">char</option> <option value="Object">Object</option> <option value="other">Other...</option> </select> </div>
+                <div class="form-group" id="customAttrTypeGroup" style="display: none;"> <label for="customAttrType">Custom Type:</label> <input type="text" id="customAttrType" placeholder="e.g., UserAccount"> </div>
+                <div class="form-group checkbox-group"> <input type="checkbox" id="attrIsStatic"> <label for="attrIsStatic">Static</label> </div>
+                <button id="addAttributeBtn" class="btn btn-success" style="width: 100%; margin-bottom: 10px;">Add Attribute</button>
+                <div class="current-members-list" id="currentAttributesList"> <p style="text-align:center; color: #888;">No attributes.</p> </div>
+            </div>
+            <div class="member-editor-section">
+                <h4>Methods</h4>
+                <div class="form-group"> <label for="methodVisibility">Visibility:</label> <select id="methodVisibility"> <option value="public" selected>Public (+)</option> <option value="private">Private (-)</option> <option value="protected">Protected (#)</option> <option value="package">Package/Default (~)</option> </select> </div>
+                <div class="form-group"> <label for="methodName">Method Name:</label> <input type="text" id="methodName" placeholder="e.g., calculateScore"> </div>
+                <div class="form-group"> <label for="methodReturnType">Return Type:</label> <select id="methodReturnType"> <option value="void">void</option> <option value="String">String</option> <option value="int">int</option> <option value="boolean">boolean</option> <option value="double">double</option> <option value="float">float</option> <option value="char">char</option> <option value="Object">Object</option> <option value="other">Other...</option> </select> </div>
+                <div class="form-group" id="customMethodReturnTypeGroup" style="display: none;"> <label for="customMethodReturnType">Custom Return Type:</label> <input type="text" id="customMethodReturnType" placeholder="e.g., UserProfile"> </div>
+                <div class="form-group"> <label for="methodParams">Parameters (comma-sep: name:Type):</label> <input type="text" id="methodParams" placeholder="e.g., count:int, isActive:boolean"> </div>
+                <div class="form-group checkbox-group"> <input type="checkbox" id="methodIsStatic"> <label for="methodIsStatic">Static</label> </div>
+                <button id="addMethodBtn" class="btn btn-success" style="width: 100%; margin-bottom: 10px;">Add Method</button>
+                <div class="current-members-list" id="currentMethodsList"> <p style="text-align:center; color: #888;">No methods.</p> </div>
+            </div>
+            <div class="modal-buttons"> <button id="doneMemberEditBtn" class="btn btn-primary">Done</button> </div>
+        </div>
+    </div>
+    <div id="multiplicityEditorModal" class="modal-overlay" style="display: none;">
+        <div class="modal-content multiplicity-editor">
+            <h3 id="multiplicityEditorTitle">Edit Association Details</h3>
+             <div class="form-group">
+                <label for="associationNameInput">Association Name (optional):</label>
+                <input type="text" id="associationNameInput" placeholder="e.g., Works For">
+            </div>
+            <div class="form-group">
+                <label for="sourceRoleInput" id="sourceRoleLabel">Role at Source:</label>
+                <input type="text" id="sourceRoleInput" placeholder="e.g., employee">
+            </div>
+            <div class="form-group">
+                <label for="targetRoleInput" id="targetRoleLabel">Role at Target:</label>
+                <input type="text" id="targetRoleInput" placeholder="e.g., employer">
+            </div>
+            <div class="form-group">
+                <label for="sourceMultiplicityInput" id="sourceMultiplicityLabel">Multiplicity at Source:</label>
+                <input type="text" id="sourceMultiplicityInput" placeholder="e.g., *, 0..*">
+            </div>
+            <div class="form-group">
+                <label for="targetMultiplicityInput" id="targetMultiplicityLabel">Multiplicity at Target:</label>
+                <input type="text" id="targetMultiplicityInput" placeholder="e.g., 1, 1..*">
+            </div>
+            <div class="modal-buttons">
+                 <button id="cancelMultiplicityEditBtn" class="btn btn-secondary">Cancel</button>
+                <button id="saveMultiplicityBtn" class="btn btn-primary">Save</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Main Content Area: Canvas + Code View -->
+    <div id="main-content" class="flex flex-col lg:flex-row gap-4 p-4">
+        <!-- Diagram Canvas -->
+        <canvas id="editorCanvas" width="1024" height="768"></canvas>
+        <!-- Generated Code View -->
+        <div id="code-view-container" class="flex-1">
+            <div id="code-view-header">
+                <h3 class="text-lg font-semibold text-center text-gray-200">Generated Java Code</h3>
+                <button id="copyCodeBtn" class="btn btn-secondary">Copy</button>
+            </div>
+            <pre><code id="javaCodeOutput" class="language-java"></code></pre>
+        </div>
+    </div>
+
+    <div id="statusBar">Select a mode to start.</div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            // --- Canvas Setup ---
+            const canvas = document.getElementById('editorCanvas');
+            const ctx = canvas.getContext('2d');
+
+            // --- State Variables ---
+            let nodes = []; let edges = []; let mode = 'select';
+            let nextNodeId = 1; let nextEdgeId = 1;
+            let selectedForEdgeStart = null; let currentEdgeType = null;
+            let tempEdgePreview = null; let selectedItem = null;
+            let draggingNode = null; let dragOffsetX = 0; let dragOffsetY = 0;
+            let hasDragged = false;
+            let editingNodeForMembers = null;
+            let editingEdgeForDetails = null;
+            let abstractConfirmCallback = null;
+            let noteCreationData = null;
+
+            // Undo/Redo State
+            let historyStack = [];
+            let redoStack = [];
+            let isUndoRedoAction = false;
+
+            // Node Styling & Structure
+            const NODE_MIN_WIDTH = 200;
+            const NODE_HEADER_HEIGHT = 30; const NODE_PADDING = 8;
+            const NODE_LINE_HEIGHT = 18; const NODE_BG_COLOR = '#c3c8c9';
+            const NODE_BORDER_COLOR = '#4b4d4e'; const NODE_TEXT_COLOR = '#4b4d4e';
+            const NODE_SECTION_TEXT_COLOR = '#1f2937';
+            const NODE_SELECTED_COLOR = '#10b981';
+            const NODE_DRAGGING_BORDER_COLOR = '#f59e0b';
+            const NODE_CONNECTION_POINT_RADIUS = 3;
+            const NODE_CONNECTION_POINT_COLOR = NODE_BORDER_COLOR;
+            const NOTE_BG_COLOR = '#fffbe5';
+            const NOTE_BORDER_COLOR = '#f59e0b';
+
+            // Inherited Member Colors
+            const INHERITED_PUBLIC_COLOR = '#3b82f6';
+            const INHERITED_PROTECTED_COLOR = '#8b5cf6';
+            const INHERITED_PRIVATE_COLOR = '#f52222';
+            const INHERITED_PACKAGE_COLOR = '#d97706';
+
+            // Edge Styling
+            const EDGE_COLOR = '#374151'; const EDGE_SELECTED_COLOR = '#ef4444';
+            const ARROW_SIZE = 20;
+            const DIAMOND_HALF_WIDTH = ARROW_SIZE * 0.7;
+            const DIAMOND_LENGTH = ARROW_SIZE * 1.4;
+            const MULTIPLICITY_ALONG_LINE_OFFSET = 20;
+            const MULTIPLICITY_PERPENDICULAR_OFFSET = 10;
+            const MULTIPLICITY_FONT_SIZE = '12px';
+
+            // --- UI Elements ---
+            const statusBar = document.getElementById('statusBar');
+            const undoBtn = document.getElementById('undoBtn');
+            const redoBtn = document.getElementById('redoBtn');
+            const javaCodeOutput = document.getElementById('javaCodeOutput');
+            const copyCodeBtn = document.getElementById('copyCodeBtn');
+
+            const createClassModal = document.getElementById('createClassModal');
+            const newIsInterfaceCheckbox = document.getElementById('newIsInterfaceCheckbox');
+            const newClassNameInput = document.getElementById('newClassNameInput');
+            const newClassAbstractGroup = document.getElementById('newClassAbstractGroup');
+            const newClassIsAbstractCheckbox = document.getElementById('newClassIsAbstract');
+            const newClassifierNameLabel = document.getElementById('newClassifierNameLabel');
+            const newClassifierParentLabel = document.getElementById('newClassifierParentLabel');
+            const newClassParentSelect = document.getElementById('newClassParentSelect');
+            const newClassAttributesText = document.getElementById('newClassAttributesText');
+            const newClassMethodsText = document.getElementById('newClassMethodsText');
+            const confirmCreateClassBtn = document.getElementById('confirmCreateClassBtn');
+            const cancelCreateClassBtn = document.getElementById('cancelCreateClassBtn');
+            const createClassModalMessage = document.getElementById('createClassModalMessage');
+            const classMemberEditorModal = document.getElementById('classMemberEditorModal');
+            const classMemberEditorTitle = document.getElementById('classMemberEditorTitle');
+            const modalMessageDisplay = document.getElementById('modalMessage');
+            const attrVisibilitySelect = document.getElementById('attrVisibility');
+            const attrNameInput = document.getElementById('attrName');
+            const attrTypeSelect = document.getElementById('attrType');
+            const attrIsStaticCheckbox = document.getElementById('attrIsStatic');
+            const customAttrTypeGroup = document.getElementById('customAttrTypeGroup');
+            const customAttrTypeInput = document.getElementById('customAttrType');
+            const addAttributeBtn = document.getElementById('addAttributeBtn');
+            const currentAttributesList = document.getElementById('currentAttributesList');
+            const methodVisibilitySelect = document.getElementById('methodVisibility');
+            const methodNameInput = document.getElementById('methodName');
+            const methodReturnTypeSelect = document.getElementById('methodReturnType');
+            const methodIsStaticCheckbox = document.getElementById('methodIsStatic');
+            const customMethodReturnTypeGroup = document.getElementById('customMethodReturnTypeGroup');
+            const customMethodReturnTypeInput = document.getElementById('customMethodReturnType');
+            const methodParamsInput = document.getElementById('methodParams');
+            const addMethodBtn = document.getElementById('addMethodBtn');
+            const currentMethodsList = document.getElementById('currentMethodsList');
+            const doneMemberEditBtn = document.getElementById('doneMemberEditBtn');
+            const multiplicityEditorModal = document.getElementById('multiplicityEditorModal');
+            const multiplicityEditorTitle = document.getElementById('multiplicityEditorTitle');
+            const associationNameInput = document.getElementById('associationNameInput');
+            const sourceRoleInput = document.getElementById('sourceRoleInput');
+            const targetRoleInput = document.getElementById('targetRoleInput');
+            const sourceMultiplicityInput = document.getElementById('sourceMultiplicityInput');
+            const targetMultiplicityInput = document.getElementById('targetMultiplicityInput');
+            const sourceMultiplicityLabel = document.getElementById('sourceMultiplicityLabel');
+            const targetMultiplicityLabel = document.getElementById('targetMultiplicityLabel');
+            const saveMultiplicityBtn = document.getElementById('saveMultiplicityBtn');
+            const cancelMultiplicityEditBtn = document.getElementById('cancelMultiplicityEditBtn');
+            const abstractConfirmModal = document.getElementById('abstractConfirmModal');
+            const abstractConfirmYes = document.getElementById('abstractConfirmYes');
+            const abstractConfirmNo = document.getElementById('abstractConfirmNo');
+            const noteEditorModal = document.getElementById('noteEditorModal');
+            const noteTextInput = document.getElementById('noteTextInput');
+            const saveNoteBtn = document.getElementById('saveNoteBtn');
+            const cancelNoteBtn = document.getElementById('cancelNoteBtn');
+
+
+            // --- Undo/Redo Functions ---
+            function saveState() {
+                if (isUndoRedoAction) return;
+                const state = JSON.stringify({ nodes, edges, nextNodeId, nextEdgeId });
+                historyStack.push(state);
+                redoStack = [];
+                updateUndoRedoButtons();
+                updateJavaCodeView();
+            }
+
+            function undo() {
+                if (historyStack.length <= 1) return;
+                isUndoRedoAction = true;
+                const currentState = historyStack.pop();
+                redoStack.push(currentState);
+                const prevState = JSON.parse(historyStack[historyStack.length - 1]);
+                loadState(prevState);
+                isUndoRedoAction = false;
+            }
+
+            function redo() {
+                if (redoStack.length === 0) return;
+                isUndoRedoAction = true;
+                const nextStateJSON = redoStack.pop();
+                historyStack.push(nextStateJSON);
+                const nextState = JSON.parse(nextStateJSON);
+                loadState(nextState);
+                isUndoRedoAction = false;
+            }
+
+            function loadState(state) {
+                nodes = state.nodes;
+                edges = state.edges;
+                nextNodeId = state.nextNodeId;
+                nextEdgeId = state.nextEdgeId;
+                redrawCanvas();
+                updateUndoRedoButtons();
+                updateJavaCodeView();
+            }
+
+            function updateUndoRedoButtons() {
+                undoBtn.disabled = historyStack.length <= 1;
+                redoBtn.disabled = redoStack.length === 0;
+            }
+
+            // --- Drawing Functions (Largely Unchanged) ---
+            function getVisibilitySymbol(visibility) {
+                switch (visibility) {
+                    case 'public': return '+'; case 'private': return '-';
+                    case 'protected': return '#'; case 'package': return '~';
+                    default: return '';
+                }
+            }
+            function collectInheritedMembers(nodeId, memberType, processedNodes = new Set()) {
+                if (processedNodes.has(nodeId)) return [];
+                processedNodes.add(nodeId);
+                const callingNode = nodes.find(n => n.id === nodeId);
+                if (!callingNode) return [];
+                let allInherited = [];
+                const parentEdges = edges.filter(e => (e.type === 'generalization' || e.type === 'realization') && e.fromNodeId === nodeId);
+
+                for (const edge of parentEdges) {
+                    const parentNode = nodes.find(n => n.id === edge.toNodeId);
+                    if (parentNode) {
+                        const parentOwnMembers = (memberType === 'attributes' ? parentNode.attributes : parentNode.methods)
+                            .map(member => ({
+                                ...member, isInherited: true, inheritedFrom: parentNode.name,
+                                isOverriddenInSubclass: (memberType === 'attributes' ? callingNode.attributes : callingNode.methods)
+                                                    .some(subMember => subMember.name === member.name)
+                            }));
+                        allInherited.push(...parentOwnMembers.filter(m => !m.isOverriddenInSubclass));
+                        allInherited.push(...collectInheritedMembers(parentNode.id, memberType, new Set(processedNodes)));
+                    }
+                }
+                const uniqueInheritedMap = new Map();
+                for (const member of allInherited) {
+                    const signature = `${member.name}_${memberType}`;
+                    if (!uniqueInheritedMap.has(signature)) {
+                        uniqueInheritedMap.set(signature, member);
+                    }
+                }
+                return Array.from(uniqueInheritedMap.values());
+            }
+            function calculateNodeHeight(node) {
+                if (node.type === 'note') return node.height;
+                const headerHeight = NODE_HEADER_HEIGHT;
+                const ownAttrCount = node.attributes.length > 0 ? node.attributes.length : 0;
+                const ownMethodCount = node.methods.length > 0 ? node.methods.length : 0;
+                const inheritedAttrs = collectInheritedMembers(node.id, 'attributes');
+                const inheritedMethods = collectInheritedMembers(node.id, 'methods');
+                const inheritedAttrCount = inheritedAttrs.length > 0 ? inheritedAttrs.length : 0;
+                const inheritedMethodCount = inheritedMethods.length > 0 ? inheritedMethods.length : 0;
+                const attrSectionHeight = NODE_PADDING * 2 + NODE_LINE_HEIGHT + ((ownAttrCount + inheritedAttrCount) * NODE_LINE_HEIGHT);
+                const methodSectionHeight = NODE_PADDING * 2 + NODE_LINE_HEIGHT + ((ownMethodCount + inheritedMethodCount) * NODE_LINE_HEIGHT);
+                return headerHeight + attrSectionHeight + methodSectionHeight + NODE_PADDING * 2 + (node.isInterface ? NODE_LINE_HEIGHT : 0);
+            }
+            function drawNode(node) {
+                if (node.type === 'note') {
+                    drawNoteNode(node);
+                    return;
+                }
+                node.height = calculateNodeHeight(node); node.width = NODE_MIN_WIDTH;
+                ctx.save();
+                ctx.fillStyle = (selectedItem?.type === 'node' && selectedItem?.id === node.id) ? NODE_SELECTED_COLOR : NODE_BG_COLOR;
+                ctx.fillRect(node.x - node.width / 2, node.y - node.height / 2, node.width, node.height);
+                ctx.strokeStyle = (draggingNode?.id === node.id) ? NODE_DRAGGING_BORDER_COLOR : NODE_BORDER_COLOR;
+                ctx.lineWidth = (draggingNode?.id === node.id) ? 3 : 1.5;
+                ctx.strokeRect(node.x - node.width / 2, node.y - node.height / 2, node.width, node.height);
+                ctx.fillStyle = NODE_CONNECTION_POINT_COLOR;
+                const points = [
+                    { x: node.x, y: node.y - node.height / 2 }, { x: node.x, y: node.y + node.height / 2 },
+                    { x: node.x - node.width / 2, y: node.y },  { x: node.x + node.width / 2, y: node.y }
+                ];
+                points.forEach(p => { ctx.beginPath(); ctx.arc(p.x, p.y, NODE_CONNECTION_POINT_RADIUS, 0, Math.PI * 2); ctx.fill(); });
+
+                ctx.fillStyle = NODE_TEXT_COLOR;
+                ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+                let headerY = node.y - node.height / 2 + NODE_HEADER_HEIGHT / 2;
+                if (node.isInterface) {
+                    ctx.font = 'italic 12px Noto Sans';
+                    ctx.fillText('<<interface>>', node.x, headerY - 5);
+                    headerY += 10;
+                }
+                const fontStyle = node.isAbstract ? 'italic bold' : 'bold';
+                ctx.font = `${fontStyle} 16px Noto Sans`;
+                ctx.fillText(node.name, node.x, headerY);
+
+                ctx.strokeStyle = NODE_BORDER_COLOR; ctx.lineWidth = 1;
+                let currentCompartmentY = node.y - node.height / 2 + NODE_HEADER_HEIGHT + (node.isInterface ? NODE_LINE_HEIGHT : 0);
+
+                function drawMembersList(startY, compartmentTitle, isAttributeType) {
+                    ctx.beginPath(); ctx.moveTo(node.x - node.width / 2, startY); ctx.lineTo(node.x + node.width / 2, startY); ctx.stroke();
+                    ctx.textAlign = 'left';
+                    let sectionContentY = startY + NODE_PADDING + NODE_LINE_HEIGHT / 2;
+                    ctx.fillStyle = NODE_SECTION_TEXT_COLOR;
+                    ctx.font = '14px Noto Sans';
+                    ctx.fillText(compartmentTitle, node.x - node.width/2 + NODE_PADDING, sectionContentY);
+                    sectionContentY += NODE_LINE_HEIGHT;
+
+                    function drawSingleMember(member, yPos, color) {
+                        const baseFont = '14px Noto Sans';
+                        const isAbstractAndShouldBeItalic = (member.isAbstract && (!member.isInherited || node.isAbstract || node.isInterface));
+                        ctx.font = isAbstractAndShouldBeItalic ? `italic ${baseFont}` : baseFont;
+
+                        ctx.fillStyle = color;
+                        let text = `${getVisibilitySymbol(member.visibility)} ${member.name}`;
+                        if (isAttributeType) text += `: ${member.type}`;
+                        else text += `(${member.params || ''}): ${member.returnType}`;
+                        if (member.isInherited) text += ` (from ${member.inheritedFrom})`;
+                        const startX = node.x - node.width/2 + NODE_PADDING + 5;
+                        ctx.fillText(text, startX, yPos, node.width - NODE_PADDING*3);
+
+                        if (member.isStatic) {
+                            const metrics = ctx.measureText(text);
+                            const lineY = yPos + NODE_LINE_HEIGHT / 2 - 2;
+                            ctx.beginPath();
+                            ctx.moveTo(startX, lineY);
+                            ctx.lineTo(startX + metrics.width, lineY);
+                            ctx.strokeStyle = color;
+                            ctx.lineWidth = 1;
+                            ctx.stroke();
+                        }
+                    }
+
+                    const ownMembers = isAttributeType ? node.attributes : node.methods;
+                    ownMembers.forEach(member => {
+                        drawSingleMember(member, sectionContentY, NODE_SECTION_TEXT_COLOR);
+                        sectionContentY += NODE_LINE_HEIGHT;
+                    });
+
+                    const inheritedMembers = collectInheritedMembers(node.id, isAttributeType ? 'attributes' : 'methods');
+                    inheritedMembers.forEach(member => {
+                        if ((isAttributeType ? node.attributes : node.methods).some(own => own.name === member.name && !own.isAssociation)) return;
+                        let color;
+                        switch (member.visibility) {
+                            case 'public': color = INHERITED_PUBLIC_COLOR; break;
+                            case 'protected': color = INHERITED_PROTECTED_COLOR; break;
+                            case 'private': color = INHERITED_PRIVATE_COLOR; break;
+                            case 'package': color = INHERITED_PACKAGE_COLOR; break;
+                            default: color = NODE_SECTION_TEXT_COLOR;
+                        }
+                        drawSingleMember(member, sectionContentY, color);
+                        sectionContentY += NODE_LINE_HEIGHT;
+                    });
+                    return startY + NODE_PADDING * 2 + NODE_LINE_HEIGHT + ((ownMembers.length + inheritedMembers.length) * NODE_LINE_HEIGHT);
+                }
+                currentCompartmentY = drawMembersList(currentCompartmentY, "Attributes:", true);
+                drawMembersList(currentCompartmentY, "Methods:", false);
+                ctx.restore();
+            }
+            function drawNoteNode(note) {
+                ctx.save();
+                ctx.fillStyle = NOTE_BG_COLOR;
+                ctx.strokeStyle = (selectedItem?.type === 'node' && selectedItem?.id === note.id) ? NODE_SELECTED_COLOR : NOTE_BORDER_COLOR;
+                ctx.lineWidth = (selectedItem?.type === 'node' && selectedItem?.id === note.id) ? 3 : 1.5;
+                ctx.beginPath();
+                ctx.moveTo(note.x - note.width / 2, note.y - note.height / 2);
+                ctx.lineTo(note.x + note.width / 2 - 15, note.y - note.height / 2);
+                ctx.lineTo(note.x + note.width / 2, note.y - note.height / 2 + 15);
+                ctx.lineTo(note.x + note.width / 2, note.y + note.height / 2);
+                ctx.lineTo(note.x - note.width / 2, note.y + note.height / 2);
+                ctx.closePath();
+                ctx.fill();
+                ctx.stroke();
+                ctx.beginPath();
+                ctx.moveTo(note.x + note.width / 2 - 15, note.y - note.height / 2);
+                ctx.lineTo(note.x + note.width / 2 - 15, note.y - note.height / 2 + 15);
+                ctx.lineTo(note.x + note.width / 2, note.y - note.height / 2 + 15);
+                ctx.stroke();
+                ctx.fillStyle = NODE_SECTION_TEXT_COLOR;
+                ctx.font = '12px Noto Sans';
+                ctx.textAlign = 'left';
+                ctx.textBaseline = 'top';
+                // Simple text wrapping
+                const words = note.text.split(' ');
+                let line = '';
+                let y = note.y - note.height/2 + 5;
+                const maxWidth = note.width - 10;
+                for(let n = 0; n < words.length; n++) {
+                    const testLine = line + words[n] + ' ';
+                    const metrics = ctx.measureText(testLine);
+                    const testWidth = metrics.width;
+                    if (testWidth > maxWidth && n > 0) {
+                        ctx.fillText(line, note.x - note.width/2 + 5, y);
+                        line = words[n] + ' ';
+                        y += NODE_LINE_HEIGHT;
+                    } else {
+                        line = testLine;
+                    }
+                }
+                ctx.fillText(line, note.x - note.width/2 + 5, y);
+                ctx.restore();
+            }
+            function getEdgeAttachPoint(node, otherNodeCenter) {
+                const points = [
+                    { x: node.x, y: node.y - node.height / 2, side: 'top' },
+                    { x: node.x, y: node.y + node.height / 2, side: 'bottom' },
+                    { x: node.x - node.width / 2, y: node.y, side: 'left' },
+                    { x: node.x + node.width / 2, y: node.y, side: 'right' }
+                ];
+                let bestPoint = points[0]; let minAngleDiff = Math.PI * 2;
+                const targetAngle = Math.atan2(otherNodeCenter.y - node.y, otherNodeCenter.x - node.x);
+                points.forEach(p => {
+                    const pointAngle = Math.atan2(p.y - node.y, p.x - node.x);
+                    let angleDiff = Math.abs(targetAngle - pointAngle);
+                    if (angleDiff > Math.PI) angleDiff = Math.PI * 2 - angleDiff;
+                    if (angleDiff < minAngleDiff) { minAngleDiff = angleDiff; bestPoint = p; }
+                });
+                return { x: bestPoint.x, y: bestPoint.y };
+            }
+            function drawEdge(edge) {
+                const fromNode = nodes.find(n => n.id === edge.fromNodeId);
+                const toNode = nodes.find(n => n.id === edge.toNodeId);
+                if (!fromNode || !toNode) return;
+                const attachPointOnFromNode = getEdgeAttachPoint(fromNode, {x: toNode.x, y: toNode.y});
+                const attachPointOnToNode = getEdgeAttachPoint(toNode, {x: fromNode.x, y: fromNode.y});
+                const sx = attachPointOnFromNode.x; const sy = attachPointOnFromNode.y;
+                const ex = attachPointOnToNode.x; const ey = attachPointOnToNode.y;
+                const angle = Math.atan2(ey - sy, ex - sx);
+                ctx.save();
+                ctx.strokeStyle = (selectedItem?.type === 'edge' && selectedItem?.id === edge.id) ? EDGE_SELECTED_COLOR : EDGE_COLOR;
+                ctx.lineWidth = (selectedItem?.type === 'edge' && selectedItem?.id === edge.id) ? 3 : 2;
+                let lineActualStartX = sx; let lineActualStartY = sy;
+                if (edge.type === 'aggregation' || edge.type === 'composition') {
+                    const tipTowardsNodeX = sx; const tipTowardsNodeY = sy;
+                    const outwardTipX = tipTowardsNodeX + DIAMOND_LENGTH * Math.cos(angle);
+                    const outwardTipY = tipTowardsNodeY + DIAMOND_LENGTH * Math.sin(angle);
+                    const midX = tipTowardsNodeX + (DIAMOND_LENGTH / 2) * Math.cos(angle);
+                    const midY = tipTowardsNodeY + (DIAMOND_LENGTH / 2) * Math.sin(angle);
+                    const sidePoint1X = midX - DIAMOND_HALF_WIDTH * Math.sin(angle);
+                    const sidePoint1Y = midY + DIAMOND_HALF_WIDTH * Math.cos(angle);
+                    const sidePoint2X = midX + DIAMOND_HALF_WIDTH * Math.sin(angle);
+                    const sidePoint2Y = midY - DIAMOND_HALF_WIDTH * Math.cos(angle);
+                    ctx.beginPath();
+                    ctx.moveTo(tipTowardsNodeX, tipTowardsNodeY); ctx.lineTo(sidePoint1X, sidePoint1Y);
+                    ctx.lineTo(outwardTipX, outwardTipY); ctx.lineTo(sidePoint2X, sidePoint2Y);
+                    ctx.closePath();
+                    if (edge.type === 'aggregation') { ctx.fillStyle = '#ffffff'; ctx.fill(); }
+                    else { ctx.fillStyle = EDGE_COLOR; ctx.fill(); }
+                    ctx.stroke();
+                    lineActualStartX = outwardTipX; lineActualStartY = outwardTipY;
+                }
+                ctx.beginPath(); ctx.moveTo(lineActualStartX, lineActualStartY);
+                if (edge.type === 'dependency' || edge.type === 'realization' || edge.type === 'noteconnector') ctx.setLineDash([5, 5]); else ctx.setLineDash([]);
+                ctx.lineTo(ex, ey); ctx.stroke(); ctx.setLineDash([]);
+                const lineAngle = Math.atan2(ey - lineActualStartY, ex - lineActualStartX);
+                if (edge.type === 'dependency') {
+                    ctx.beginPath(); ctx.moveTo(ex, ey);
+                    ctx.lineTo(ex - ARROW_SIZE * Math.cos(lineAngle - Math.PI / 6), ey - ARROW_SIZE * Math.sin(lineAngle - Math.PI / 6));
+                    ctx.moveTo(ex, ey);
+                    ctx.lineTo(ex - ARROW_SIZE * Math.cos(lineAngle + Math.PI / 6), ey - ARROW_SIZE * Math.sin(lineAngle + Math.PI / 6));
+                    ctx.stroke();
+                } else if (edge.type === 'generalization' || edge.type === 'realization') {
+                    ctx.beginPath(); ctx.fillStyle = '#ffffff';
+                    const tipX = ex; const tipY = ey;
+                    const point1X = tipX - ARROW_SIZE * 1.5 * Math.cos(lineAngle - Math.PI / 7);
+                    const point1Y = tipY - ARROW_SIZE * 1.5 * Math.sin(lineAngle - Math.PI / 7);
+                    const point2X = tipX - ARROW_SIZE * 1.5 * Math.cos(lineAngle + Math.PI / 7);
+                    const point2Y = tipY - ARROW_SIZE * 1.5 * Math.sin(lineAngle + Math.PI / 7);
+                    ctx.moveTo(tipX, tipY); ctx.lineTo(point1X, point1Y);
+                    ctx.lineTo(point2X, point2Y);
+                    ctx.closePath(); ctx.fill(); ctx.stroke();
+                }
+                if (edge.type === 'association' || edge.type === 'aggregation' || edge.type === 'composition') {
+                    ctx.fillStyle = EDGE_COLOR;
+                    ctx.font = `${MULTIPLICITY_FONT_SIZE} Noto Sans`;
+                    ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+                    const midX = (lineActualStartX + ex) / 2;
+                    const midY = (lineActualStartY + ey) / 2;
+                    if(edge.name) ctx.fillText(edge.name, midX, midY - 10);
+                    if (edge.sourceMultiplicity) {
+                        const textBaseX = lineActualStartX + MULTIPLICITY_ALONG_LINE_OFFSET * Math.cos(lineAngle);
+                        const textBaseY = lineActualStartY + MULTIPLICITY_ALONG_LINE_OFFSET * Math.sin(lineAngle);
+                        const textX = textBaseX + MULTIPLICITY_PERPENDICULAR_OFFSET * Math.cos(lineAngle + Math.PI / 2);
+                        const textY = textBaseY + MULTIPLICITY_PERPENDICULAR_OFFSET * Math.sin(lineAngle + Math.PI / 2);
+                        ctx.fillText(edge.sourceMultiplicity, textX, textY);
+                    }
+                    if (edge.sourceRole) {
+                        const textX = lineActualStartX + MULTIPLICITY_ALONG_LINE_OFFSET * Math.cos(lineAngle) + MULTIPLICITY_PERPENDICULAR_OFFSET * Math.cos(lineAngle - Math.PI / 2);
+                        const textY = lineActualStartY + MULTIPLICITY_ALONG_LINE_OFFSET * Math.sin(lineAngle) + MULTIPLICITY_PERPENDICULAR_OFFSET * Math.sin(lineAngle - Math.PI / 2);
+                        ctx.fillText(edge.sourceRole, textX, textY);
+                    }
+                    if (edge.targetMultiplicity) {
+                        const textBaseX = ex - MULTIPLICITY_ALONG_LINE_OFFSET * Math.cos(lineAngle);
+                        const textBaseY = ey - MULTIPLICITY_ALONG_LINE_OFFSET * Math.sin(lineAngle);
+                        const textX = textBaseX + MULTIPLICITY_PERPENDICULAR_OFFSET * Math.cos(lineAngle + Math.PI / 2);
+                        const textY = textBaseY + MULTIPLICITY_PERPENDICULAR_OFFSET * Math.sin(lineAngle + Math.PI / 2);
+                        ctx.fillText(edge.targetMultiplicity, textX, textY);
+                    }
+                    if (edge.targetRole) {
+                        const textX = ex - MULTIPLICITY_ALONG_LINE_OFFSET * Math.cos(lineAngle) + MULTIPLICITY_PERPENDICULAR_OFFSET * Math.cos(lineAngle - Math.PI / 2);
+                        const textY = ey - MULTIPLICITY_ALONG_LINE_OFFSET * Math.sin(lineAngle) + MULTIPLICITY_PERPENDICULAR_OFFSET * Math.sin(lineAngle - Math.PI / 2);
+                        ctx.fillText(edge.targetRole, textX, textY);
+                    }
+                }
+                ctx.restore();
+            }
+            function drawTemporaryEdgePreview() {
+                if (tempEdgePreview && selectedForEdgeStart) {
+                    const startNode = selectedForEdgeStart;
+                    const tempEndPoint = {x: tempEdgePreview.x2, y: tempEdgePreview.y2};
+                    const attachPoint = getEdgeAttachPoint(startNode, tempEndPoint);
+                    ctx.save(); ctx.beginPath();
+                    ctx.moveTo(attachPoint.x, attachPoint.y);
+                    ctx.lineTo(tempEndPoint.x, tempEndPoint.y);
+                    ctx.strokeStyle = '#a0aec0';
+                    ctx.lineWidth = 2; ctx.setLineDash([3, 3]); ctx.stroke(); ctx.setLineDash([]); ctx.restore();
+                }
+            }
+            function redrawCanvas() {
+                ctx.clearRect(0, 0, canvas.width, canvas.height);
+                edges.forEach(drawEdge);
+                drawTemporaryEdgePreview();
+                nodes.forEach(drawNode);
+            }
+
+            // --- Interaction Logic ---
+            function getClickedNode(mouseX, mouseY) {
+                for (let i = nodes.length - 1; i >= 0; i--) {
+                    const node = nodes[i]; const currentHeight = calculateNodeHeight(node);
+                    if ( mouseX >= node.x - node.width / 2 && mouseX <= node.x + node.width / 2 &&
+                        mouseY >= node.y - currentHeight / 2 && mouseY <= node.y + currentHeight / 2 ) { return node; }
+                } return null;
+            }
+            function getClickedEdge(mouseX, mouseY) {
+                const tolerance = 8;
+                for (let i = edges.length - 1; i >= 0; i--) {
+                    const edge = edges[i];
+                    const fromNode = nodes.find(n => n.id === edge.fromNodeId);
+                    const toNode = nodes.find(n => n.id === edge.toNodeId);
+                    if (!fromNode || !toNode) continue;
+                    const p1_attach = getEdgeAttachPoint(fromNode, toNode);
+                    const p2_attach = getEdgeAttachPoint(toNode, fromNode);
+                    let lineActualStartX = p1_attach.x; let lineActualStartY = p1_attach.y;
+                    if (edge.type === 'aggregation' || edge.type === 'composition') {
+                        const angle = Math.atan2(p2_attach.y - p1_attach.y, p2_attach.x - p1_attach.x);
+                        lineActualStartX = p1_attach.x + DIAMOND_LENGTH * Math.cos(angle);
+                        lineActualStartY = p1_attach.y + DIAMOND_LENGTH * Math.sin(angle);
+                    }
+                    const L2 = (p2_attach.x - lineActualStartX)**2 + (p2_attach.y - lineActualStartY)**2; if (L2 === 0) continue;
+                    const t = ((mouseX - lineActualStartX) * (p2_attach.x - lineActualStartX) + (mouseY - lineActualStartY) * (p2_attach.y - lineActualStartY)) / L2;
+                    const tClamped = Math.max(0, Math.min(1, t));
+                    const closestX = lineActualStartX + tClamped * (p2_attach.x - lineActualStartX);
+                    const closestY = lineActualStartY + tClamped * (p2_attach.y - lineActualStartY);
+                    const dx = mouseX - closestX; const dy = mouseY - closestY;
+                    if (Math.sqrt(dx*dx + dy*dy) <= tolerance) return edge;
+                } return null;
+            }
+            function handleMouseDown(event) {
+                if (classMemberEditorModal.style.display === 'flex' ||
+                    multiplicityEditorModal.style.display === 'flex' ||
+                    createClassModal.style.display === 'flex' ||
+                    noteEditorModal.style.display === 'flex') return;
+                const rect = canvas.getBoundingClientRect(); const mouseX = event.clientX - rect.left; const mouseY = event.clientY - rect.top;
+                hasDragged = false; if (mode.startsWith('addEdgeStart_')) return;
+                const clickedNode = getClickedNode(mouseX, mouseY);
+                if (clickedNode && mode === 'select') {
+                    draggingNode = clickedNode; dragOffsetX = mouseX - draggingNode.x; dragOffsetY = mouseY - draggingNode.y;
+                    event.preventDefault(); canvas.style.cursor = 'grabbing';
+                }
+            }
+            function handleMouseMove(event) {
+                if (classMemberEditorModal.style.display === 'flex' ||
+                    multiplicityEditorModal.style.display === 'flex' ||
+                    createClassModal.style.display === 'flex' ||
+                    noteEditorModal.style.display === 'flex' ) return;
+                const rect = canvas.getBoundingClientRect(); const mouseX = event.clientX - rect.left; const mouseY = event.clientY - rect.top;
+                if (draggingNode) {
+                    hasDragged = true; draggingNode.x = mouseX - dragOffsetX; draggingNode.y = mouseY - dragOffsetY; redrawCanvas();
+                } else if (mode.startsWith('addEdgeEnd_') && selectedForEdgeStart) {
+                    tempEdgePreview = { x1: selectedForEdgeStart.x, y1: selectedForEdgeStart.y, x2: mouseX, y2: mouseY };
+                    redrawCanvas();
+                } else {
+                    const potentialNode = getClickedNode(mouseX, mouseY);
+                    if (potentialNode && mode === 'select') canvas.style.cursor = 'grab';
+                    else if (mode === 'select' && getClickedEdge(mouseX, mouseY)) canvas.style.cursor = 'pointer';
+                    else canvas.style.cursor = 'default';
+                }
+            }
+            function handleMouseUp(event) {
+                if (draggingNode) {
+                    saveState(); // Save state after drag finishes
+                    draggingNode = null;
+                    canvas.style.cursor = (mode === 'select' && getClickedNode(event.clientX - canvas.getBoundingClientRect().left, event.clientY - canvas.getBoundingClientRect().top)) ? 'grab' : 'default';
+                    redrawCanvas();
+                }
+            }
+            function handleMouseLeave(event) {
+                if (classMemberEditorModal.style.display === 'flex' ||
+                    multiplicityEditorModal.style.display === 'flex' ||
+                    createClassModal.style.display === 'flex' ||
+                    noteEditorModal.style.display === 'flex' ) return;
+                if (draggingNode) {
+                    saveState(); // Also save if drag ends outside canvas
+                    draggingNode = null;
+                    redrawCanvas();
+                }
+                if (mode.startsWith('addEdgeEnd_')) { tempEdgePreview = null; redrawCanvas(); }
+                canvas.style.cursor = 'default';
+            }
+
+            let lastClickTime = 0; const DOUBLE_CLICK_DELAY = 300;
+            function handleCanvasClick(event) {
+                if (classMemberEditorModal.style.display === 'flex' ||
+                    multiplicityEditorModal.style.display === 'flex' ||
+                    createClassModal.style.display === 'flex' ||
+                    noteEditorModal.style.display === 'flex') return;
+                if (hasDragged) { hasDragged = false; return; }
+                const currentTime = new Date().getTime(); const timeSinceLastClick = currentTime - lastClickTime;
+                const rect = canvas.getBoundingClientRect(); const mouseX = event.clientX - rect.left; const mouseY = event.clientY - rect.top;
+
+                if (timeSinceLastClick < DOUBLE_CLICK_DELAY) { // Double click
+                    const clickedNode = getClickedNode(mouseX, mouseY);
+                    const clickedEdge = clickedNode ? null : getClickedEdge(mouseX, mouseY);
+                    if (clickedNode && mode === 'select' && clickedNode.type !== 'note') { openClassMemberEditor(clickedNode); }
+                    else if (clickedNode && mode === 'select' && clickedNode.type === 'note') { openNoteEditorModal(mouseX, mouseY, clickedNode); }
+                    else if (clickedEdge && mode === 'select' && (clickedEdge.type === 'association' || clickedEdge.type === 'aggregation' || clickedEdge.type === 'composition')) { openAssociationEditor(clickedEdge); }
+                    lastClickTime = 0; return;
+                }
+                lastClickTime = currentTime; // Single click
+
+                if (mode === 'addNode') { // This mode is now triggered by the "Add Classifier" button directly
+                    openCreateClassModal(mouseX, mouseY);
+                } else if (mode === 'addNote') {
+                    openNoteEditorModal(mouseX, mouseY);
+                } else if (mode.startsWith('addEdgeStart_')) {
+                    const clickedNode = getClickedNode(mouseX, mouseY);
+                    if(currentEdgeType === 'noteconnector' && (!clickedNode || clickedNode.type !== 'note')) {
+                        updateStatusBar('Please select a Note to start the link from.');
+                        return;
+                    }
+                    if (clickedNode) {
+                        selectedForEdgeStart = clickedNode; currentEdgeType = mode.split('_')[1];
+                        mode = `addEdgeEnd_${currentEdgeType}`;
+                        updateStatusBar(`Selected source ${clickedNode.name || 'Note'}. Click target element.`);
+                        tempEdgePreview = { x1: clickedNode.x, y1: clickedNode.y, x2: mouseX, y2: mouseY };
+                    } else { updateStatusBar('No node clicked. Click a source element.'); }
+                } else if (mode.startsWith('addEdgeEnd_')) {
+                    const clickedNode = getClickedNode(mouseX, mouseY);
+                    if (clickedNode && selectedForEdgeStart && clickedNode.id !== selectedForEdgeStart.id) {
+                        const fromNode = selectedForEdgeStart;
+                        const toNode = clickedNode;
+                        const newEdge = {
+                            id: nextEdgeId++, fromNodeId: fromNode.id, toNodeId: toNode.id,
+                            type: currentEdgeType, sourceMultiplicity: '', targetMultiplicity: '', name: '', sourceRole: '', targetRole: ''
+                        };
+                        edges.push(newEdge);
+
+                        if (currentEdgeType === 'generalization' && toNode.isAbstract) {
+                            showAbstractConfirmModal(fromNode); // This function will call saveState and changeMode
+                        } else {
+                            changeMode('select', `${currentEdgeType.charAt(0).toUpperCase() + currentEdgeType.slice(1)} edge created. Switched to Select mode.`, 'selectModeBtn');
+                            saveState();
+                        }
+
+                    } else if (clickedNode && selectedForEdgeStart && clickedNode.id === selectedForEdgeStart.id) {
+                        updateStatusBar('Cannot connect a node to itself.');
+                    } else {
+                        changeMode('select', 'Edge creation cancelled. Switched to Select mode.', 'selectModeBtn');
+                    }
+                } else if (mode === 'select') {
+                    const clickedNode = getClickedNode(mouseX, mouseY);
+                    const clickedEdge = clickedNode ? null : getClickedEdge(mouseX, mouseY);
+                    if (clickedNode) {
+                        selectedItem = { type: 'node', id: clickedNode.id };
+                        updateStatusBar(`Selected ${clickedNode.type || 'Node'}: ${clickedNode.name || 'Note'}. Drag or Delete.`);
+                    } else if (clickedEdge) {
+                        selectedItem = { type: 'edge', id: clickedEdge.id };
+                        const fromN = nodes.find(n=>n.id === clickedEdge.fromNodeId); const toN = nodes.find(n=>n.id === clickedEdge.toNodeId);
+                        let statusMsg = `Selected ${clickedEdge.type} Edge: ${fromN?.name || 'Note'} to ${toN?.name || 'Note'}.`;
+                        if (clickedEdge.type === 'association' || clickedEdge.type === 'aggregation' || clickedEdge.type === 'composition') {
+                            statusMsg += ` Double-click to edit details.`;
+                        }
+                        updateStatusBar(statusMsg);
+                    } else { selectedItem = null; updateStatusBar('Selection cleared.'); }
+                } redrawCanvas(); updateModeButtons();
+            }
+
+            // --- Create Class Modal Functions ---
+            function showCreateClassModalMessage(message, isError = false) {
+                createClassModalMessage.textContent = message;
+                createClassModalMessage.className = isError ? 'error' : 'success';
+                createClassModalMessage.style.display = 'block';
+                setTimeout(() => { createClassModalMessage.style.display = 'none'; }, 3000);
+            }
+            function openCreateClassModal(mouseX, mouseY) {
+                newClassNameInput.value = `Classifier${nextNodeId}`;
+                newIsInterfaceCheckbox.checked = false;
+                newClassIsAbstractCheckbox.checked = false;
+                newClassAbstractGroup.style.display = 'flex';
+                newClassifierNameLabel.textContent = 'Class Name:';
+                newClassifierParentLabel.textContent = 'Parent Class:';
+                newClassAttributesText.value = '';
+                newClassMethodsText.value = '';
+                newClassParentSelect.innerHTML = '<option value="">None</option>';
+                nodes.forEach(node => {
+                    if (node.type !== 'note') {
+                        const option = document.createElement('option');
+                        option.value = node.id;
+                        option.textContent = node.name;
+                        newClassParentSelect.appendChild(option);
+                    }
+                });
+                createClassModal.style.display = 'flex';
+                newClassNameInput.focus();
+                updateStatusBar('Enter details for the new classifier.');
+                // Store position for creation
+                createClassModal.dataset.mouseX = mouseX;
+                createClassModal.dataset.mouseY = mouseY;
+            }
+            function parseMemberString(memberString, isAttribute) {
+                const members = [];
+                if (!memberString.trim()) return members;
+                const lines = memberString.trim().split('\n');
+                const visibilityRegex = /^([+\-#~])/;
+                lines.forEach(line => {
+                    line = line.trim(); if (!line) return;
+                    let isStatic = false;
+                    let isAbstract = false;
+                    if (line.includes('{static}')) {
+                        isStatic = true;
+                        line = line.replace(/\{static\}/g, '').trim();
+                    }
+                    if (line.includes('{abstract}')) {
+                        isAbstract = true;
+                        line = line.replace(/\{abstract\}/g, '').trim();
+                    }
+
+                    let visibility = 'private';
+                    const visMatch = line.match(visibilityRegex);
+                    if (visMatch) {
+                        switch(visMatch[1]) {
+                            case '+': visibility = 'public'; break; case '-': visibility = 'private'; break;
+                            case '#': visibility = 'protected'; break; case '~': visibility = 'package'; break;
+                        }
+                        line = line.substring(1).trim();
+                    }
+                    if (isAttribute) {
+                        const parts = line.split(':');
+                        if (parts.length === 2) {
+                            const name = parts[0].trim(); const type = parts[1].trim();
+                            if (name && type) members.push({ visibility, name, type, isAssociation: false, isStatic, isAbstract: false });
+                        }
+                    } else {
+                        const methodRegex = /([a-zA-Z0-9_]+)\s*\((.*?)\)\s*:\s*([a-zA-Z0-9_<>:]+)/;
+                        const match = line.match(methodRegex);
+                        if (match) {
+                            const name = match[1].trim(); const params = match[2].trim(); const returnType = match[3].trim();
+                            if (name && returnType !== undefined) members.push({ visibility, name, params, returnType, isStatic, isAbstract });
+                        } else {
+                            const simpleMethodRegex = /([a-zA-Z0-9_]+)\s*\(\s*\)\s*:\s*([a-zA-Z0-9_<>:]+)/;
+                            const simpleMatch = line.match(simpleMethodRegex);
+                            if(simpleMatch){
+                                const name = simpleMatch[1].trim(); const returnType = simpleMatch[2].trim();
+                                if (name && returnType !== undefined) members.push({ visibility, name, params: '', returnType, isStatic, isAbstract });
+                            }
+                        }
+                    }
+                });
+                return members;
+            }
+            confirmCreateClassBtn.addEventListener('click', () => {
+                const className = newClassNameInput.value.trim();
+                if (!className) { showCreateClassModalMessage("Classifier name cannot be empty.", true); newClassNameInput.focus(); return; }
+                if (nodes.some(n => n.name === className)) { showCreateClassModalMessage("A classifier with this name already exists.", true); newClassNameInput.focus(); return; }
+
+                const isInterface = newIsInterfaceCheckbox.checked;
+                const parentId = newClassParentSelect.value ? parseInt(newClassParentSelect.value) : null;
+                const isAbstract = isInterface || newClassIsAbstractCheckbox.checked;
+                let initialAttributes = parseMemberString(newClassAttributesText.value, true);
+                let initialMethods = parseMemberString(newClassMethodsText.value, false);
+
+                if (isInterface) { // All methods in an interface are public and abstract
+                    initialMethods.forEach(m => { m.isAbstract = true; m.visibility = 'public'; });
+                }
+
+                let posX = parseInt(createClassModal.dataset.mouseX) || (150 + (nodes.length % 4) * (NODE_MIN_WIDTH + 50));
+                let posY = parseInt(createClassModal.dataset.mouseY) || (150 + Math.floor(nodes.length / 4) * (NODE_MIN_WIDTH + 50));
+                const newNode = { id: nextNodeId++, type: 'classifier', x: posX, y: posY, width: NODE_MIN_WIDTH, name: className, attributes: initialAttributes, methods: initialMethods, isAbstract: isAbstract, isInterface: isInterface };
+                nodes.push(newNode);
+
+                if (parentId) {
+                    const parentNode = nodes.find(n => n.id === parentId);
+                    if (parentNode) {
+                        const edgeType = newNode.isInterface && parentNode.isInterface ? 'generalization'
+                                        : !newNode.isInterface && !parentNode.isInterface ? 'generalization'
+                                        : 'realization';
+                        edges.push({ id: nextEdgeId++, fromNodeId: newNode.id, toNodeId: parentNode.id, type: edgeType, sourceMultiplicity: '', targetMultiplicity: '' });
+                    }
+                }
+                createClassModal.style.display = 'none';
+                changeMode('select', `Classifier "${className}" created. Switched to Select mode.`, 'selectModeBtn');
+                saveState();
+            });
+            newIsInterfaceCheckbox.addEventListener('change', (e) => {
+                const isInterface = e.target.checked;
+                newClassAbstractGroup.style.display = isInterface ? 'none' : 'flex';
+                newClassifierNameLabel.textContent = isInterface ? 'Interface Name:' : 'Class Name:';
+                newClassifierParentLabel.textContent = isInterface ? 'Extends Interface:' : 'Parent Class:';
+                const currentParentId = newClassParentSelect.value;
+                newClassParentSelect.innerHTML = '<option value="">None</option>';
+                nodes.filter(n => n.type !== 'note').forEach(node => { // Allow extending classes or implementing interfaces
+                    const option = document.createElement('option');
+                    option.value = node.id;
+                    option.textContent = node.name + (node.isInterface ? ' (Interface)' : ' (Class)');
+                    newClassParentSelect.appendChild(option);
+                });
+                newClassParentSelect.value = currentParentId;
+            });
+            cancelCreateClassBtn.addEventListener('click', () => {
+                createClassModal.style.display = 'none';
+                updateStatusBar('Classifier creation cancelled. Select a mode.');
+            });
+
+            // --- Note Editor Functions ---
+            function openNoteEditorModal(x, y, existingNote = null) {
+                if (existingNote) {
+                    noteTextInput.value = existingNote.text;
+                    noteCreationData = { id: existingNote.id };
+                } else {
+                    noteTextInput.value = "A new note";
+                    noteCreationData = { x, y };
+                }
+                noteEditorModal.style.display = 'flex';
+                noteTextInput.focus(); noteTextInput.select();
+            }
+            saveNoteBtn.addEventListener('click', () => {
+                const noteText = noteTextInput.value;
+                if (noteCreationData.id) { // Updating
+                    const note = nodes.find(n => n.id === noteCreationData.id);
+                    if (note) note.text = noteText;
+                } else { // Creating
+                    const newNote = {
+                        id: nextNodeId++, type: 'note', x: noteCreationData.x, y: noteCreationData.y,
+                        width: 150, height: 80, text: noteText
+                    };
+                    nodes.push(newNote);
+                }
+                noteEditorModal.style.display = 'none';
+                noteCreationData = null;
+                changeMode('select', 'Note saved. Switched to Select mode.', 'selectModeBtn');
+                saveState();
+            });
+            cancelNoteBtn.addEventListener('click', () => {
+                noteEditorModal.style.display = 'none';
+                noteCreationData = null;
+            });
+
+            // --- Class Member Editor Functions ---
+            function showModalMessage(message, isError = false) {
+                modalMessageDisplay.textContent = message;
+                modalMessageDisplay.className = isError ? 'error' : 'success';
+                modalMessageDisplay.style.display = 'block';
+                setTimeout(() => { modalMessageDisplay.style.display = 'none';}, 3000);
+            }
+            function openClassMemberEditor(node) {
+                editingNodeForMembers = node;
+                classMemberEditorTitle.textContent = `Edit Members for ${node.isInterface ? 'Interface' : 'Class'} ${node.name}`;
+                renderAttributesInModal(); renderMethodsInModal();
+                classMemberEditorModal.style.display = 'flex';
+                modalMessageDisplay.style.display = 'none';
+                attrVisibilitySelect.value = 'public'; attrNameInput.value = ''; attrIsStaticCheckbox.checked = false;
+                attrTypeSelect.value = 'String'; customAttrTypeGroup.style.display = 'none'; customAttrTypeInput.value = '';
+                methodVisibilitySelect.value = 'public'; methodNameInput.value = ''; methodIsStaticCheckbox.checked = false;
+                methodReturnTypeSelect.value = 'void'; customMethodReturnTypeGroup.style.display = 'none'; customMethodReturnTypeInput.value = '';
+                methodParamsInput.value = ''; attrNameInput.focus();
+                updateStatusBar(`Editing members for ${node.name}.`);
+            }
+            function renderAttributesInModal() {
+                if (!editingNodeForMembers) return;
+                currentAttributesList.innerHTML = '';
+                const allAttributes = [
+                    ...editingNodeForMembers.attributes.map(a => ({...a, isAssoc: false })),
+                    ...getAssociationAttributesForNode(editingNodeForMembers.id).map(a => ({...a, isAssoc: true }))
+                ];
+                if (allAttributes.length === 0) {
+                    currentAttributesList.innerHTML = '<p style="text-align:center; color: #888;">No attributes.</p>'; return;
+                }
+                allAttributes.forEach((attr, index) => {
+                    const itemDiv = document.createElement('div');
+                    itemDiv.innerHTML = `<span>${getVisibilitySymbol(attr.visibility)} ${attr.name}: ${attr.type} ${attr.isStatic ? '<u>(static)</u>' : ''} ${attr.isAssoc ? '(assoc.)':''}</span>`;
+                    const deleteBtn = document.createElement('button'); deleteBtn.innerHTML = '&times;';
+                    deleteBtn.className = 'delete-member-btn'; deleteBtn.title = 'Delete attribute';
+                    if (attr.isAssoc) {
+                        deleteBtn.disabled = true; deleteBtn.style.opacity = 0.5; deleteBtn.title = 'Managed by association edge';
+                    } else {
+                        deleteBtn.onclick = () => deleteAttribute(attr.name);
+                    }
+                    itemDiv.appendChild(deleteBtn); currentAttributesList.appendChild(itemDiv);
+                });
+            }
+            function renderMethodsInModal() {
+                if (!editingNodeForMembers) return;
+                currentMethodsList.innerHTML = '';
+                if (editingNodeForMembers.methods.length === 0) {
+                    currentMethodsList.innerHTML = '<p style="text-align:center; color: #888;">No methods.</p>'; return;
+                }
+                editingNodeForMembers.methods.forEach((method, index) => {
+                    const itemDiv = document.createElement('div');
+                    itemDiv.innerHTML = `<span>${getVisibilitySymbol(method.visibility)} ${method.name}(${method.params || ''}): ${method.returnType} ${method.isStatic ? '<u>(static)</u>' : ''} ${method.isAbstract ? '<i>(abstract)</i>' : ''}</span>`;
+                    const deleteBtn = document.createElement('button'); deleteBtn.innerHTML = '&times;';
+                    deleteBtn.className = 'delete-member-btn'; deleteBtn.title = 'Delete method';
+                    deleteBtn.onclick = () => deleteMethod(index);
+                    itemDiv.appendChild(deleteBtn); currentMethodsList.appendChild(itemDiv);
+                });
+            }
+            attrTypeSelect.addEventListener('change', function() { customAttrTypeGroup.style.display = (this.value === 'other') ? 'block' : 'none'; if(this.value === 'other') customAttrTypeInput.focus(); });
+            methodReturnTypeSelect.addEventListener('change', function() { customMethodReturnTypeGroup.style.display = (this.value === 'other') ? 'block' : 'none'; if(this.value === 'other') customMethodReturnTypeInput.focus();});
+            addAttributeBtn.addEventListener('click', () => {
+                if (!editingNodeForMembers) return;
+                const visibility = attrVisibilitySelect.value; const name = attrNameInput.value.trim();
+                let type = attrTypeSelect.value; if (type === 'other') type = customAttrTypeInput.value.trim();
+                const isStatic = attrIsStaticCheckbox.checked;
+                if (!name) { showModalMessage("Attribute name cannot be empty.", true); attrNameInput.focus(); return; }
+                if (!type) { showModalMessage("Attribute type cannot be empty.", true); if(attrTypeSelect.value === 'other') customAttrTypeInput.focus(); return;}
+                if (editingNodeForMembers.attributes.some(a => a.name === name)) {
+                    showModalMessage("An attribute with this name already exists.", true); return;
+                }
+                editingNodeForMembers.attributes.push({ visibility, name, type, isStatic, isAbstract: false });
+                renderAttributesInModal(); redrawCanvas();
+                attrNameInput.value = ''; attrTypeSelect.value = 'String'; customAttrTypeGroup.style.display = 'none'; customAttrTypeInput.value = ''; attrIsStaticCheckbox.checked = false; attrNameInput.focus();
+                showModalMessage("Attribute added.", false);
+            });
+            addMethodBtn.addEventListener('click', () => {
+                if (!editingNodeForMembers) return;
+                const visibility = methodVisibilitySelect.value; const name = methodNameInput.value.trim();
+                let returnType = methodReturnTypeSelect.value; if (returnType === 'other') returnType = customMethodReturnTypeInput.value.trim();
+                const params = methodParamsInput.value.trim();
+                const isStatic = methodIsStaticCheckbox.checked;
+                if (!name) { showModalMessage("Method name cannot be empty.", true); methodNameInput.focus(); return; }
+                if (!returnType) { showModalMessage("Method return type cannot be empty.", true); if(methodReturnTypeSelect.value === 'other') customMethodReturnTypeInput.focus(); return; }
+
+                const methodSignature = `${name}(${params})`;
+                if (editingNodeForMembers.methods.some(m => `${m.name}(${m.params || ''})` === methodSignature)) {
+                    showModalMessage("A method with this signature already exists.", true); return;
+                }
+
+                editingNodeForMembers.methods.push({ visibility, name, returnType, params, isStatic, isAbstract: false });
+                renderMethodsInModal(); redrawCanvas();
+                methodNameInput.value = ''; methodReturnTypeSelect.value = 'void'; customMethodReturnTypeGroup.style.display = 'none'; customMethodReturnTypeInput.value = ''; methodParamsInput.value = ''; methodIsStaticCheckbox.checked = false; methodNameInput.focus();
+                showModalMessage("Method added.", false);
+            });
+            function deleteAttribute(name) {
+                if (!editingNodeForMembers) return;
+                const initialLength = editingNodeForMembers.attributes.length;
+                editingNodeForMembers.attributes = editingNodeForMembers.attributes.filter(attr => attr.name !== name);
+                if (editingNodeForMembers.attributes.length < initialLength) {
+                    renderAttributesInModal(); redrawCanvas();
+                    showModalMessage("Attribute deleted.", false);
+                }
+            }
+            function deleteMethod(index) {
+                if (!editingNodeForMembers || !editingNodeForMembers.methods[index]) return;
+                editingNodeForMembers.methods.splice(index, 1); renderMethodsInModal(); redrawCanvas();
+                showModalMessage("Method deleted.", false);
+            }
+            doneMemberEditBtn.addEventListener('click', () => {
+                saveState(); // Save changes on done
+                classMemberEditorModal.style.display = 'none'; editingNodeForMembers = null;
+                redrawCanvas(); updateStatusBar('Member editing finished. Select a mode or item.');
+            });
+
+            // --- Multiplicity Editor Functions ---
+            function openAssociationEditor(edge) {
+                editingEdgeForDetails = edge;
+                const fromNode = nodes.find(n => n.id === edge.fromNodeId);
+                const toNode = nodes.find(n => n.id === edge.toNodeId);
+                multiplicityEditorTitle.textContent = `Edit Association Details`;
+                associationNameInput.value = edge.name || '';
+                sourceRoleInput.value = edge.sourceRole || '';
+                targetRoleInput.value = edge.targetRole || '';
+                sourceMultiplicityInput.value = edge.sourceMultiplicity || '';
+                targetMultiplicityInput.value = edge.targetMultiplicity || '';
+                sourceMultiplicityLabel.textContent = `Details at ${fromNode.name} end:`;
+                targetMultiplicityLabel.textContent = `Details at ${toNode.name} end:`;
+                multiplicityEditorModal.style.display = 'flex';
+                associationNameInput.focus();
+                updateStatusBar(`Editing association between ${fromNode.name} and ${toNode.name}.`);
+            }
+            saveMultiplicityBtn.addEventListener('click', () => {
+                if (!editingEdgeForDetails) return;
+                editingEdgeForDetails.name = associationNameInput.value.trim();
+                editingEdgeForDetails.sourceRole = sourceRoleInput.value.trim();
+                editingEdgeForDetails.targetRole = targetRoleInput.value.trim();
+                editingEdgeForDetails.sourceMultiplicity = sourceMultiplicityInput.value.trim();
+                editingEdgeForDetails.targetMultiplicity = targetMultiplicityInput.value.trim();
+                multiplicityEditorModal.style.display = 'none';
+                editingEdgeForDetails = null;
+                redrawCanvas();
+                saveState();
+                updateStatusBar('Association details saved. Select a mode or item.');
+            });
+            cancelMultiplicityEditBtn.addEventListener('click', () => {
+                multiplicityEditorModal.style.display = 'none';
+                editingEdgeForDetails = null; updateStatusBar('Association editing cancelled.');
+            });
+
+            // Abstract Confirm Modal
+            function showAbstractConfirmModal(childNode) {
+                abstractConfirmModal.style.display = 'flex';
+                abstractConfirmCallback = (isAbstract) => {
+                    childNode.isAbstract = isAbstract;
+                    abstractConfirmModal.style.display = 'none';
+                    let msg = `Generalization edge created. ${childNode.name} is now ${isAbstract ? 'abstract' : 'concrete'}.`;
+                    if (!isAbstract) msg += ' Remember to implement inherited abstract methods.';
+                    changeMode('select', msg, 'selectModeBtn');
+                    saveState();
+                };
+            }
+            abstractConfirmYes.addEventListener('click', () => { if(abstractConfirmCallback) abstractConfirmCallback(true); });
+            abstractConfirmNo.addEventListener('click', () => { if(abstractConfirmCallback) abstractConfirmCallback(false); });
+
+
+            // --- Other Functions ---
+            function deleteSelectedItem() {
+                if (!selectedItem) { updateStatusBar("Nothing selected."); return; }
+                if (selectedItem.type === 'node') {
+                    const nodeToDelete = nodes.find(n => n.id === selectedItem.id);
+                    const deletedNodeName = nodeToDelete?.name;
+                    nodes = nodes.filter(node => node.id !== selectedItem.id);
+                    edges = edges.filter(edge => edge.fromNodeId !== selectedItem.id && edge.toNodeId !== selectedItem.id);
+                    updateStatusBar(`Node ${deletedNodeName || 'ID:'+selectedItem.id} deleted.`);
+                } else if (selectedItem.type === 'edge') {
+                    edges = edges.filter(edge => edge.id !== selectedItem.id);
+                    updateStatusBar(`Edge deleted.`);
+                }
+                selectedItem = null;
+                redrawCanvas(); updateModeButtons();
+                saveState();
+            }
+            function updateStatusBar(message) { if(statusBar) statusBar.textContent = message; }
+            function setActiveButton(activeBtnId) {
+                ['selectModeBtn', 'addNodeBtn', 'addNoteBtn', 'addAssociationBtn', 'addDependencyBtn', 'addGeneralizationBtn', 'addRealizationBtn', 'addAggregationBtn', 'addCompositionBtn', 'addNoteLinkBtn'].forEach(id => { document.getElementById(id)?.classList.remove('active'); });
+                if(activeBtnId) document.getElementById(activeBtnId)?.classList.add('active');
+            }
+            function updateModeButtons() {
+                const deleteBtn = document.getElementById('deleteSelectedBtn'); if(deleteBtn){ deleteBtn.disabled = !selectedItem; deleteBtn.style.opacity = selectedItem ? '1' : '0.5'; }
+                const activeBtn = document.querySelector('#toolbar .active');
+                if (activeBtn) activeBtn.classList.remove('active');
+                const newActiveBtn = document.getElementById(mode.split('_')[0] + 'Btn'); // e.g. addEdgeStart_association -> addAssociationBtn
+                if (newActiveBtn) newActiveBtn.classList.add('active');
+                else if (mode === 'select') document.getElementById('selectModeBtn').classList.add('active');
+            }
+            const customConfirmYesBtn = document.getElementById('customConfirmYes'); const customConfirmNoBtn = document.getElementById('customConfirmNo'); let currentConfirmCallback = null;
+            function showCustomConfirm(message, callback) {
+                const modal = document.getElementById('customConfirmModal'); const msgElement = document.getElementById('customConfirmMessage');
+                if(modal && msgElement){ msgElement.textContent = message; modal.style.display = 'flex'; currentConfirmCallback = callback; }
+            }
+            if(customConfirmYesBtn) customConfirmYesBtn.addEventListener('click', () => { if (currentConfirmCallback) currentConfirmCallback(true); document.getElementById('customConfirmModal').style.display = 'none'; });
+            if(customConfirmNoBtn) customConfirmNoBtn.addEventListener('click', () => { if (currentConfirmCallback) currentConfirmCallback(false); document.getElementById('customConfirmModal').style.display = 'none'; });
+
+            function changeMode(newMode, statusMessage, buttonId) {
+                [createClassModal, classMemberEditorModal, multiplicityEditorModal, abstractConfirmModal, noteEditorModal].forEach(modal => {
+                    if(modal) modal.style.display = 'none';
+                });
+                editingNodeForMembers = null; editingEdgeForDetails = null;
+                mode = newMode;
+                if (newMode !== 'select') {
+                    selectedItem = null;
+                }
+                selectedForEdgeStart = null; tempEdgePreview = null;
+                updateStatusBar(statusMessage); redrawCanvas();
+                if(buttonId) setActiveButton(buttonId); else setActiveButton(null);
+            }
+
+            // --- Event Listeners Setup ---
+            document.getElementById('selectModeBtn')?.addEventListener('click', () => changeMode('select', 'Select Mode: Click items, drag, or double-click to edit.', 'selectModeBtn'));
+            document.getElementById('addNodeBtn')?.addEventListener('click', (e) => {
+                const rect = canvas.getBoundingClientRect();
+                openCreateClassModal(rect.left + 100, rect.top + 100);
+            });
+            document.getElementById('addNoteBtn')?.addEventListener('click', () => changeMode('addNote', 'Add Note: Click on canvas to place note.', 'addNoteBtn'));
+            function setupEdgeMode(edgeTypeName, buttonId) { changeMode(`addEdgeStart_${edgeTypeName}`, `Add ${edgeTypeName.charAt(0).toUpperCase() + edgeTypeName.slice(1)}: Click source classifier.`, buttonId); currentEdgeType = edgeTypeName; }
+            document.getElementById('addAssociationBtn')?.addEventListener('click', () => setupEdgeMode('association', 'addAssociationBtn'));
+            document.getElementById('addDependencyBtn')?.addEventListener('click', () => setupEdgeMode('dependency', 'addDependencyBtn'));
+            document.getElementById('addGeneralizationBtn')?.addEventListener('click', () => setupEdgeMode('generalization', 'addGeneralizationBtn'));
+            document.getElementById('addRealizationBtn')?.addEventListener('click', () => setupEdgeMode('realization', 'addRealizationBtn'));
+            document.getElementById('addAggregationBtn')?.addEventListener('click', () => setupEdgeMode('aggregation', 'addAggregationBtn'));
+            document.getElementById('addCompositionBtn')?.addEventListener('click', () => setupEdgeMode('composition', 'addCompositionBtn'));
+            document.getElementById('addNoteLinkBtn')?.addEventListener('click', () => setupEdgeMode('noteconnector', 'addNoteLinkBtn'));
+            document.getElementById('deleteSelectedBtn')?.addEventListener('click', deleteSelectedItem);
+            document.getElementById('clearCanvasBtn')?.addEventListener('click', () => {
+                showCustomConfirm("Are you sure you want to clear the entire canvas?", (confirmed) => {
+                    if (confirmed) {
+                        nodes = []; edges = []; nextNodeId = 1; nextEdgeId = 1; selectedItem = null; selectedForEdgeStart = null; tempEdgePreview = null; draggingNode = null;
+                        historyStack = []; redoStack = [];
+                        saveState();
+                        changeMode('select', 'Canvas cleared. Select a mode.', 'selectModeBtn');
+                    } else { updateStatusBar('Clear canvas cancelled.'); }
+                });
+            });
+            document.getElementById('saveBtn')?.addEventListener('click', () => {
+                const dataStr = JSON.stringify({ nodes, edges, nextNodeId, nextEdgeId });
+                const dataUri = 'data:application/json;charset=utf-8,'+ encodeURIComponent(dataStr);
+                const exportFileDefaultName = 'uml-diagram.json';
+                const linkElement = document.createElement('a');
+                linkElement.setAttribute('href', dataUri);
+                linkElement.setAttribute('download', exportFileDefaultName);
+                linkElement.click();
+                updateStatusBar('Diagram saved to file.');
+            });
+            document.getElementById('loadInput')?.addEventListener('change', (event) => {
+                const file = event.target.files[0];
+                if (!file) return;
+                const reader = new FileReader();
+                reader.onload = (e) => {
+                    try {
+                        const state = JSON.parse(e.target.result);
+                        if (state && state.nodes && state.edges) {
+                            historyStack = []; redoStack = []; // Reset history
+                            loadState(state);
+                            saveState(); // Save the loaded state as the new initial history point
+                            updateStatusBar('Diagram loaded successfully.');
+                        } else { throw new Error("Invalid file format."); }
+                    } catch (err) {
+                        alert('Error loading file: ' + err.message);
+                    }
+                };
+                reader.readAsText(file);
+                event.target.value = ''; // Clear input
+            });
+            document.getElementById('exportPngBtn')?.addEventListener('click', () => {
+                selectedItem = null; // Deselect item before export for clean look
+                redrawCanvas();
+                const dataUrl = canvas.toDataURL('image/png');
+                const linkElement = document.createElement('a');
+                linkElement.setAttribute('href', dataUrl);
+                linkElement.setAttribute('download', 'uml-diagram.png');
+                linkElement.click();
+                updateStatusBar('Diagram exported as PNG.');
+            });
+            document.getElementById('undoBtn')?.addEventListener('click', undo);
+            document.getElementById('redoBtn')?.addEventListener('click', redo);
+            copyCodeBtn.addEventListener('click', () => {
+                const codeToCopy = javaCodeOutput.textContent;
+                const tempTextArea = document.createElement('textarea');
+                tempTextArea.value = codeToCopy;
+                document.body.appendChild(tempTextArea);
+                tempTextArea.select();
+                document.execCommand('copy');
+                document.body.removeChild(tempTextArea);
+                updateStatusBar('Java code copied to clipboard!');
+                // Briefly change button text to give feedback
+                const originalText = copyCodeBtn.textContent;
+                copyCodeBtn.textContent = 'Copied!';
+                setTimeout(() => {
+                    copyCodeBtn.textContent = originalText;
+                }, 1500);
+            });
+
+
+            canvas.addEventListener('mousedown', handleMouseDown); canvas.addEventListener('mousemove', handleMouseMove);
+            canvas.addEventListener('mouseup', handleMouseUp); canvas.addEventListener('mouseleave', handleMouseLeave);
+            canvas.addEventListener('click', handleCanvasClick);
+
+            // ================================================================
+            // JAVA CODE GENERATION LOGIC
+            // ================================================================
+
+            /**
+             * Converts UML visibility to Java keywords.
+             */
+            function getJavaVisibility(visibility) {
+                switch (visibility) {
+                    case 'public': return 'public';
+                    case 'private': return 'private';
+                    case 'protected': return 'protected';
+                    case 'package': return ''; // Package-private in Java has no keyword
+                    default: return 'private';
+                }
+            }
+
+            /**
+             * Checks if a UML multiplicity string implies a collection.
+             */
+            function isCollection(multi) {
+                if (!multi) return false;
+                return multi.includes('*') || (parseInt(multi) > 1);
+            }
+
+            /**
+             * Gathers all association-related attributes for a given node.
+             */
+            function getAssociationAttributesForNode(nodeId) {
+                let assocAttrs = [];
+                const relevantEdges = edges.filter(e => ['association', 'aggregation', 'composition'].includes(e.type));
+
+                relevantEdges.forEach(edge => {
+                    const fromNode = nodes.find(n => n.id === edge.fromNodeId);
+                    const toNode = nodes.find(n => n.id === edge.toNodeId);
+                    if (!fromNode || !toNode) return;
+
+                    if (edge.fromNodeId === nodeId) { // This node is the source
+                        const type = isCollection(edge.targetMultiplicity) ? `List<${toNode.name}>` : toNode.name;
+                        const name = edge.targetRole || (isCollection(edge.targetMultiplicity) ? `${toNode.name.charAt(0).toLowerCase() + toNode.name.slice(1)}List` : toNode.name.charAt(0).toLowerCase() + toNode.name.slice(1));
+                        assocAttrs.push({ visibility: 'private', name, type, isStatic: false, isAbstract: false });
+                    }
+                    
+                    // For bidirectional, check the source multiplicity
+                    if (edge.toNodeId === nodeId && edge.sourceMultiplicity) { // This node is the target
+                        const type = isCollection(edge.sourceMultiplicity) ? `List<${fromNode.name}>` : fromNode.name;
+                        const name = edge.sourceRole || (isCollection(edge.sourceMultiplicity) ? `${fromNode.name.charAt(0).toLowerCase() + fromNode.name.slice(1)}List` : fromNode.name.charAt(0).toLowerCase() + fromNode.name.slice(1));
+                        assocAttrs.push({ visibility: 'private', name, type, isStatic: false, isAbstract: false });
+                    }
+                });
+                return assocAttrs;
+            }
+
+            /**
+             * Generates a placeholder method body with a default return value.
+             */
+            function getMethodBody(method, indent) {
+                let returnStatement = '';
+                if (method.returnType && method.returnType.toLowerCase() !== 'void') {
+                    let defaultValue = 'null';
+                    const type = method.returnType.toLowerCase();
+                    if (['int', 'double', 'float', 'long', 'short', 'byte'].includes(type)) defaultValue = '0';
+                    else if (type === 'boolean') defaultValue = 'false';
+                    else if (type === 'char') defaultValue = "'\\u0000'";
+                    returnStatement = `\n${indent}${indent}return ${defaultValue};`;
+                }
+                return ` {\n${indent}${indent}// TODO: Implement this method${returnStatement}\n${indent}}`;
+            }
+            
+            /**
+             * Generates a method signature string for comparison, normalizing parameter types.
+             */
+            function getMethodSignature(method) {
+                const params = (method.params || '').split(',').map(p => {
+                    const parts = p.trim().split(':');
+                    return parts.length === 2 ? parts[1].trim() : '';
+                }).join(',');
+                return `${method.name}(${params})`;
+            }
+
+
+            /**
+             * Generates the entire Java code for the current diagram.
+             */
+            function generateJavaCode() {
+                let code = "import java.util.List;\nimport java.util.ArrayList;\n\n";
+                const classifiers = nodes.filter(n => n.type === 'classifier');
+
+                classifiers.forEach(node => {
+                    // --- Definition and Inheritance ---
+                    let definition = getJavaVisibility('public');
+                    if (definition) definition += ' ';
+                    if (node.isAbstract && !node.isInterface) definition += 'abstract ';
+                    definition += node.isInterface ? 'interface ' : 'class ';
+                    definition += node.name;
+
+                    const generalizations = edges.filter(e => e.fromNodeId === node.id && e.type === 'generalization');
+                    const realizations = edges.filter(e => e.fromNodeId === node.id && e.type === 'realization');
+
+                    if (node.isInterface) {
+                        const parentInterfaces = generalizations.map(g => nodes.find(n => n.id === g.toNodeId)?.name).filter(Boolean);
+                        if (parentInterfaces.length > 0) definition += ` extends ${parentInterfaces.join(', ')}`;
+                    } else {
+                        const parentClassEdge = generalizations.find(g => !nodes.find(n => n.id === g.toNodeId)?.isInterface);
+                        if (parentClassEdge) {
+                            const parent = nodes.find(n => n.id === parentClassEdge.toNodeId);
+                            if (parent) definition += ` extends ${parent.name}`;
+                        }
+                        const implementedInterfaces = realizations.map(r => nodes.find(n => n.id === r.toNodeId)?.name).filter(Boolean);
+                        if (implementedInterfaces.length > 0) definition += ` implements ${[...new Set(implementedInterfaces)].join(', ')}`;
+                    }
+
+                    code += `${definition} {\n\n`;
+                    const indent = '    ';
+
+                    // --- Attributes ---
+                    const ownAttributes = node.attributes;
+                    const associationAttributes = getAssociationAttributesForNode(node.id);
+                    const allAttributes = [...ownAttributes, ...associationAttributes];
+                    const uniqueAttributes = new Map();
+                    allAttributes.forEach(attr => uniqueAttributes.set(attr.name, attr));
+                    
+                    if (uniqueAttributes.size > 0) {
+                        uniqueAttributes.forEach(attr => {
+                            let attrDef = getJavaVisibility(attr.visibility);
+                            if (attrDef) attrDef += ' ';
+                            if (attr.isStatic) attrDef += 'static ';
+                            attrDef += `${attr.type} ${attr.name};`;
+                            code += `${indent}${attrDef}\n`;
+                        });
+                        code += '\n';
+                    }
+
+                    // --- Methods ---
+                    const ownMethods = node.methods;
+                    const implementedSignatures = new Set(ownMethods.map(getMethodSignature));
+
+                    // --- Abstract Methods to Implement ---
+                    const methodsToImplement = new Map();
+                    
+                    // Recursive function to collect all abstract methods from the inheritance hierarchy
+                    function collectAbstractMethods(fromNodeId, processedNodes = new Set()) {
+                        if (!fromNodeId || processedNodes.has(fromNodeId)) return;
+                        processedNodes.add(fromNodeId);
+
+                        const current = nodes.find(n => n.id === fromNodeId);
+                        if (!current) return;
+                        
+                        current.methods.forEach(m => {
+                            if (m.isAbstract || current.isInterface) {
+                            const sig = getMethodSignature(m);
+                            if (!implementedSignatures.has(sig)) {
+                                methodsToImplement.set(sig, m);
+                            }
+                            }
+                        });
+
+                        // Recurse up the hierarchy (both generalization and realization)
+                        edges.filter(e => e.fromNodeId === fromNodeId && (e.type === 'generalization' || e.type === 'realization'))
+                            .forEach(e => collectAbstractMethods(e.toNodeId, processedNodes));
+                    }
+                    
+                    // Only concrete classes need to implement methods
+                    if (!node.isAbstract && !node.isInterface) {
+                        collectAbstractMethods(node.id);
+                    }
+
+                    // --- Generate Own Methods Code ---
+                    if (ownMethods.length > 0) {
+                        ownMethods.forEach(method => {
+                            let methodDef = getJavaVisibility(method.visibility);
+                            if (methodDef) methodDef += ' ';
+                            if (method.isStatic) methodDef += 'static ';
+                            if (method.isAbstract && !node.isInterface) methodDef += 'abstract ';
+                            methodDef += `${method.returnType} ${method.name}(`;
+
+                            if (method.params) {
+                                methodDef += method.params.split(',').map(p => {
+                                    const parts = p.trim().split(':');
+                                    return parts.length === 2 ? `${parts[1].trim()} ${parts[0].trim()}` : p.trim();
+                                }).join(', ');
+                            }
+                            methodDef += `)`;
+
+                            if (node.isInterface || method.isAbstract) {
+                                methodDef += ';\n';
+                            } else {
+                                methodDef += getMethodBody(method, indent);
+                            }
+                            code += `${indent}${methodDef}\n`;
+                        });
+                    }
+                    
+                    // --- Generate Implemented Methods Code ---
+                    if (methodsToImplement.size > 0) {
+                        code += `\n${indent}// --- Methods Implemented from Interfaces/Abstract Classes ---\n`;
+                        methodsToImplement.forEach(method => {
+                            let methodDef = '@Override\n' + indent + 'public '; // Implemented methods are public
+                            methodDef += `${method.returnType} ${method.name}(`;
+                            if (method.params) {
+                                methodDef += method.params.split(',').map(p => {
+                                    const parts = p.trim().split(':');
+                                    return parts.length === 2 ? `${parts[1].trim()} ${parts[0].trim()}` : p.trim();
+                                }).join(', ');
+                            }
+                            methodDef += `)`;
+                            methodDef += getMethodBody(method, indent);
+                            code += `${indent}${methodDef}\n`;
+                        });
+                    }
+
+                    code += '}\n\n';
+                });
+
+                return code;
+            }
+
+
+            /**
+             * Updates the text area with the newly generated and highlighted Java code.
+             */
+            function updateJavaCodeView() {
+                if (javaCodeOutput) {
+                    const code = generateJavaCode();
+                    javaCodeOutput.textContent = code; // Use textContent for <pre><code>
+                    hljs.highlightElement(javaCodeOutput); // Apply highlighting
+                }
+            }
+
+
+            // --- Initial Load ---
+            saveState(); // Save initial empty state
+            updateStatusBar('Select a mode. Double-click a class to edit, or an association edge for details.');
+            redrawCanvas();
+            updateModeButtons();
+            updateJavaCodeView(); // Initial code generation
+        });
+    </script>
+</body>
+</html>
